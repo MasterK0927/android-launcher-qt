@@ -383,6 +383,57 @@ LauncherPage {
         property bool canBeDeleted: false
         property int menuItemHeight: 40
 
+        MouseArea {
+            id: menuMouseArea
+            anchors.fill: parent
+            hoverEnabled: true
+            
+            onPositionChanged: {
+                var selectedItem = null
+                
+                // Checking for the menu item is under cursor
+                // It will be null if no menu item is under cursor
+                // Helps in giving springboard like functionality
+                var items = [addShortCutItem, openAppItem, removeAppItem, removePinnedShortcutItem]
+                for (var i = 0; i < items.length; i++) {
+                    var item = items[i]
+                    if (!item.visible) continue
+                    
+                    var itemPos = item.mapToItem(menuMouseArea, 0, 0)
+                    if (mouseY >= itemPos.y && mouseY <= itemPos.y + item.height) {
+                        selectedItem = item
+                        break
+                    }
+                }
+                
+                // Updating the selection of menu
+                // triggering vibration if menu is changed
+                if (selectedItem !== contextMenu.selectedMenuItem) {
+                    contextMenu.selectedMenuItem = selectedItem
+                    
+                    // Resets all items to default state
+                    // Removes bold effect from all other items
+                    items.forEach(function(item) {
+                        item.font.bold = false
+                        item.font.pointSize = appLauncher.labelPointSize
+                    })
+                    
+                    // Highlights the selected item
+                    if (selectedItem) {
+                        selectedItem.font.bold = true
+                        selectedItem.font.pointSize = appLauncher.labelPointSize * 1.2
+                        
+                        // Triggers the vibration based on the selected item
+                        // using AN API
+                        if (mainView.useVibration) {
+                            AN.SystemDispatcher.dispatch("volla.launcher.vibrationAction", 
+                                {"duration": mainView.vibrationDuration})
+                        }
+                    }
+                }
+            }
+        }
+
         background: Rectangle {
             id: menuBackground
             implicitWidth: contextMenu.menuWidth
@@ -403,17 +454,17 @@ LauncherPage {
             }
             background: Rectangle {
                 anchors.fill: parent
-                color: "transparent"
+                color: parent === contextMenu.selectedMenuItem ? Qt.rgba(1, 1, 1, 0.1) : "transparent"
             }
             onClicked: {
                 console.log("AppGrid | App " + contextMenu.app["label"] + " selected for shortcuts");
                 contextMenu.gridView.currentIndex = -1
                 mainView.updateAction(contextMenu.app["itemId"],
-                                      true,
-                                      mainView.settingsAction.CREATE,
-                                      {"id": contextMenu.app["itemId"],
-                                       "name": qsTr("Open") + " " + contextMenu.app["label"],
-                                       "activated": true} )
+                                    true,
+                                    mainView.settingsAction.CREATE,
+                                    {"id": contextMenu.app["itemId"],
+                                    "name": qsTr("Open") + " " + contextMenu.app["label"],
+                                    "activated": true} )
             }
         }
         MenuItem {
@@ -427,7 +478,7 @@ LauncherPage {
             }
             background: Rectangle {
                 anchors.fill: parent
-                color: "transparent"
+                color: parent === contextMenu.selectedMenuItem ? Qt.rgba(1, 1, 1, 0.1) : "transparent"
             }
             onClicked: {
                 console.log("AppGrid | App " + contextMenu.
@@ -448,7 +499,7 @@ LauncherPage {
                 }
             }
         }
-        MenuItem {
+         MenuItem {
             id: removeAppItem
             anchors.margins: mainView.innerSpacing
             height: removeAppItem.visible ? contextMenu.menuItemHeight : 0
@@ -460,11 +511,11 @@ LauncherPage {
             }
             background: Rectangle {
                 anchors.fill: parent
-                color: "transparent"
+                color: parent === contextMenu.selectedMenuItem ? Qt.rgba(1, 1, 1, 0.1) : "transparent"
             }
             visible: contextMenu.canBeDeleted
             onClicked: {
-                    AN.SystemDispatcher.dispatch("volla.launcher.deleteAppAction", {"appId": contextMenu.app["package"]})
+                AN.SystemDispatcher.dispatch("volla.launcher.deleteAppAction", {"appId": contextMenu.app["package"]})
             }
         }
         MenuItem {
@@ -479,7 +530,7 @@ LauncherPage {
             }
             background: Rectangle {
                 anchors.fill: parent
-                color: "transparent"
+                color: parent === contextMenu.selectedMenuItem ? Qt.rgba(1, 1, 1, 0.1) : "transparent"
             }
             visible: contextMenu.isPinnedShortcut
             onClicked: {
@@ -497,6 +548,10 @@ LauncherPage {
 
         onAboutToShow: {
             AN.SystemDispatcher.dispatch("volla.launcher.canDeleteAppAction", {"appId": contextMenu.app["package"]})
+        }
+
+        onClosed: {
+            selectedMenuItem = null
         }
 
         Connections {
